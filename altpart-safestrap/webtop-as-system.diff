@@ -1,0 +1,358 @@
+diff --git a/2nd-init/fixboot.sh b/2nd-init/fixboot.sh
+index 8471b11..19036e3 100755
+--- a/2nd-init/fixboot.sh
++++ b/2nd-init/fixboot.sh
+@@ -69,6 +69,12 @@ if [ ! -e "$BLOCK_DIR/$BLOCK_SYSTEM-orig" ]; then
+ 		$BBX ln -s $BLOCK_DIR/loop-cache $BLOCK_DIR/$BLOCK_CACHE
+ #		$BBX ln -s $BLOCK_DIR/loop-boot $BLOCK_DIR/$BLOCK_BOOT
+ 		$BBX ln -s /dev/null $BLOCK_DIR/$BLOCK_BOOT
++	elif [ "$SLOT_LOC" = "altpart" ]; then
++		$BBX ln -s $BLOCK_DIR/$BLOCK_WEBTOP $BLOCK_DIR/$BLOCK_SYSTEM
++		$BBX ln -s $BLOCK_DIR/$BLOCK_USERDATA-orig $BLOCK_DIR/$BLOCK_USERDATA
++		$BBX ln -s $BLOCK_DIR/$BLOCK_CACHE-orig $BLOCK_DIR/$BLOCK_CACHE
++#		$BBX ln -s $BLOCK_DIR/loop-boot $BLOCK_DIR/$BLOCK_BOOT
++		$BBX ln -s /dev/null $BLOCK_DIR/$BLOCK_BOOT
+ 	else
+ 		echo "stock" > $SS_DIR/active_slot
+ 		$BBX ln -s $BLOCK_DIR/$BLOCK_SYSTEM-orig $BLOCK_DIR/$BLOCK_SYSTEM
+diff --git a/2nd-init/ss_function.sh b/2nd-init/ss_function.sh
+index 4c331a9..928e81a 100755
+--- a/2nd-init/ss_function.sh
++++ b/2nd-init/ss_function.sh
+@@ -13,6 +13,10 @@ readConfig() {
+ 	USERDATA_FSTYPE=$($BBX fgrep "USERDATA_FSTYPE=" $SS_CONFIG | $BBX sed 's/USERDATA_FSTYPE=//')
+ 	BLOCK_CACHE=$($BBX fgrep "CACHE=" $SS_CONFIG | $BBX sed 's/CACHE=//')
+ 	BLOCK_BOOT=$($BBX fgrep "BOOT=" $SS_CONFIG | $BBX sed 's/BOOT=//')
++	BLOCK_PREINSTALL=$($BBX fgrep "PREINSTALL=" $SS_CONFIG | $BBX sed 's/PREINSTALL=//')
++	PREINSTALL_FSTYPE=$($BBX fgrep "PREINSTALL_FSTYPE=" $SS_CONFIG | $BBX sed 's/PREINSTALL_FSTYPE=//')
++	BLOCK_WEBTOP=$($BBX fgrep "WEBTOP=" $SS_CONFIG | $BBX sed 's/WEBTOP=//')
++	WEBTOP_FSTYPE=$($BBX fgrep "WEBTOP_FSTYPE=" $SS_CONFIG | $BBX sed 's/WEBTOP_FSTYPE=//')
+ 	SS_PART=$($BBX fgrep "SS_PART=" $SS_CONFIG | $BBX sed 's/SS_PART=//')
+ 	SS_FSTYPE=$($BBX fgrep "SS_FSTYPE=" $SS_CONFIG | $BBX sed 's/SS_FSTYPE=//')
+ 	SS_DIR=$($BBX fgrep "SS_DIR=" $SS_CONFIG | $BBX sed 's/SS_DIR=//')
+diff --git a/apk/assets/ss.config b/apk/assets/ss.config
+index 2d01408..2d6779a 100644
+--- a/apk/assets/ss.config
++++ b/apk/assets/ss.config
+@@ -3,8 +3,12 @@ SYSTEM=mmcblk1p20
+ USERDATA=mmcblk1p24
+ CACHE=mmcblk1p21
+ BOOT=mmcblk1p14
++PREINSTALL=mmcblk1p22
++WEBTOP=mmcblk1p23
+ SYSTEM_FSTYPE=ext3
+ USERDATA_FSTYPE=ext3
++PREINSTALL_FSTYPE=ext3
++WEBTOP_FSTYPE=ext4
+ SS_FSTYPE=vfat
+ SS_PART=mmcblk1p25
+ SS_DIR=/ss/safestrap
+diff --git a/apk/assets/ss_function.sh b/apk/assets/ss_function.sh
+index 4c331a9..928e81a 100644
+--- a/apk/assets/ss_function.sh
++++ b/apk/assets/ss_function.sh
+@@ -13,6 +13,10 @@ readConfig() {
+ 	USERDATA_FSTYPE=$($BBX fgrep "USERDATA_FSTYPE=" $SS_CONFIG | $BBX sed 's/USERDATA_FSTYPE=//')
+ 	BLOCK_CACHE=$($BBX fgrep "CACHE=" $SS_CONFIG | $BBX sed 's/CACHE=//')
+ 	BLOCK_BOOT=$($BBX fgrep "BOOT=" $SS_CONFIG | $BBX sed 's/BOOT=//')
++	BLOCK_PREINSTALL=$($BBX fgrep "PREINSTALL=" $SS_CONFIG | $BBX sed 's/PREINSTALL=//')
++	PREINSTALL_FSTYPE=$($BBX fgrep "PREINSTALL_FSTYPE=" $SS_CONFIG | $BBX sed 's/PREINSTALL_FSTYPE=//')
++	BLOCK_WEBTOP=$($BBX fgrep "WEBTOP=" $SS_CONFIG | $BBX sed 's/WEBTOP=//')
++	WEBTOP_FSTYPE=$($BBX fgrep "WEBTOP_FSTYPE=" $SS_CONFIG | $BBX sed 's/WEBTOP_FSTYPE=//')
+ 	SS_PART=$($BBX fgrep "SS_PART=" $SS_CONFIG | $BBX sed 's/SS_PART=//')
+ 	SS_FSTYPE=$($BBX fgrep "SS_FSTYPE=" $SS_CONFIG | $BBX sed 's/SS_FSTYPE=//')
+ 	SS_DIR=$($BBX fgrep "SS_DIR=" $SS_CONFIG | $BBX sed 's/SS_DIR=//')
+diff --git a/install-files/bin/logwrapper b/install-files/bin/logwrapper
+index 967b778..45a8a15 100755
+--- a/install-files/bin/logwrapper
++++ b/install-files/bin/logwrapper
+@@ -9,6 +9,7 @@ SS_CHECK_FILE=/.safestrapped
+ CURRENT_SYS_DIR=/system
+ CURRENT_USER_DIR=/data
+ ALT_SYSTEM_MODE="0"
++ALT_PART="0"
+ RUN_SS="0"
+ 
+ if [ "$2" = "pds" ]; then
+@@ -98,6 +99,11 @@ if [ "$RUN_SS" = "1" ]; then
+ 		fi
+ 	fi
+ 
++	# check if SLOT_LOC starts with altpart
++	if [ "${SLOT_LOC#\altpart}" != "${SLOT_LOC}" ]; then
++		ALT_PART="1"
++	fi
++
+ 	# check for .recovery_mode on current /data mount
+ 	if [ "$ALT_SYSTEM_MODE" = "1" ]; then
+ 		# setup loopback
+@@ -218,9 +224,12 @@ if [ "$RUN_SS" = "1" ]; then
+ 		$BBX losetup $BLOCK_DIR/loop-system $SS_DIR/$SLOT_LOC/system.img
+ 		$BBX mount -t $SYSTEM_FSTYPE $BLOCK_DIR/loop-system $SYS2_MNT
+ 		CURRENT_SYS_DIR=$SYS2_MNT
++	elif [ "$SLOT_LOC" = "altpart" ]; then
++		$BBX mount -t $WEBTOP_FSTYPE $BLOCK_DIR/$BLOCK_WEBTOP $SYS2_MNT
++		CURRENT_SYS_DIR=$SYS2_MNT
+ 	fi
+ 
+-	if [ "$ALT_SYSTEM_MODE" = "1" ] || [ -d "$CURRENT_SYS_DIR/etc/rootfs" ] || [ -d "$CURRENT_SYS_DIR/etc/kexec" ]; then
++	if [ "$ALT_SYSTEM_MODE" = "1" ] || [ "$ALT_PART" = "1" ] || [ -d "$CURRENT_SYS_DIR/etc/rootfs" ] || [ -d "$CURRENT_SYS_DIR/etc/kexec" ]; then
+ 		if [ -f "/sbin/taskset" ]; then
+ 			$BBX mv /sbin/taskset /sbin/taskset.old
+ 		fi
+@@ -228,11 +237,13 @@ if [ "$RUN_SS" = "1" ]; then
+ 		$BBX chmod 750 /sbin/*
+ 
+ 		# on virtual systems, check for hijacks, and remove
+-		if [ "$ALT_SYSTEM_MODE" = "1" ] && [ -f "$SYS2_MNT/$HIJACK_LOC/$HIJACK_BIN.bin" ]; then
+-			$BBX rm $CURRENT_SYS_DIR/$HIJACK_LOC/$HIJACK_BIN
+-			$BBX mv $CURRENT_SYS_DIR/$HIJACK_LOC/$HIJACK_BIN.bin $CURRENT_SYS_DIR/$HIJACK_LOC/$HIJACK_BIN
+-			$BBX chmod 755 $CURRENT_SYS_DIR/$HIJACK_LOC/$HIJACK_BIN
+-			$BBX chown 0.2000 $CURRENT_SYS_DIR/$HIJACK_LOC/$HIJACK_BIN
++		if [ "$ALT_SYSTEM_MODE" = "1" ] || [ "$ALT_PART" = "1" ]; then
++			if [ -f "$SYS2_MNT/$HIJACK_LOC/$HIJACK_BIN.bin" ]; then
++				$BBX rm $CURRENT_SYS_DIR/$HIJACK_LOC/$HIJACK_BIN
++				$BBX mv $CURRENT_SYS_DIR/$HIJACK_LOC/$HIJACK_BIN.bin $CURRENT_SYS_DIR/$HIJACK_LOC/$HIJACK_BIN
++				$BBX chmod 755 $CURRENT_SYS_DIR/$HIJACK_LOC/$HIJACK_BIN
++				$BBX chown 0.2000 $CURRENT_SYS_DIR/$HIJACK_LOC/$HIJACK_BIN
++			fi
+ 		fi
+ 
+ 		# check for kexec files
+@@ -244,6 +255,9 @@ if [ "$RUN_SS" = "1" ]; then
+ 				# cleanup loopback
+ 				$BBX umount $SYS2_MNT
+ 				$BBX losetup -d $BLOCK_DIR/loop-system
++			elif [ "$ALT_PART" = "1" ]; then
++				# umount alternative system
++				$BBX umount $SYS2_MNT
+ 			fi
+ 
+ 			# unmount SS
+@@ -268,7 +282,7 @@ if [ "$RUN_SS" = "1" ]; then
+ 		fi
+ 
+ 		# check for alt-system or rootfs files
+-		if [ "$ALT_SYSTEM_MODE" = "1" ] || [ -d "$CURRENT_SYS_DIR/etc/rootfs" ]; then
++		if [ "$ALT_SYSTEM_MODE" = "1" ] || [ "$ALT_PART" = "1" ] || [ -d "$CURRENT_SYS_DIR/etc/rootfs" ]; then
+ 			# BEGIN CLEANUP TODO: this should really be a device independant cleanup file
+ 			if [ -d "$RECOVERY_DIR/rootfs" ]; then
+ 				if [ -f "$RECOVERY_DIR/rootfs/sbin/adbd" ]; then
+@@ -306,6 +320,9 @@ if [ "$RUN_SS" = "1" ]; then
+ 				# cleanup loopback
+ 				$BBX umount $SYS2_MNT
+ 				$BBX losetup -d $BLOCK_DIR/loop-system
++			elif [ "$ALT_PART" = "1" ]; then
++				# umount alternative system
++				$BBX umount $SYS2_MNT
+ 			fi
+ 
+ 			# unmount SS
+@@ -339,6 +356,9 @@ if [ "$RUN_SS" = "1" ]; then
+ 		# cleanup loopback
+ 		$BBX umount $SYS2_MNT
+ 		$BBX losetup -d $BLOCK_DIR/loop-system
++	elif [ "$ALT_PART" = "1" ]; then
++		# umount alternative system
++		$BBX umount $SYS2_MNT
+ 	fi
+ 
+ 	# unmount safestrap partition
+diff --git a/install-files/etc/safestrap/ss.config b/install-files/etc/safestrap/ss.config
+index 2d01408..2d6779a 100644
+--- a/install-files/etc/safestrap/ss.config
++++ b/install-files/etc/safestrap/ss.config
+@@ -3,8 +3,12 @@ SYSTEM=mmcblk1p20
+ USERDATA=mmcblk1p24
+ CACHE=mmcblk1p21
+ BOOT=mmcblk1p14
++PREINSTALL=mmcblk1p22
++WEBTOP=mmcblk1p23
+ SYSTEM_FSTYPE=ext3
+ USERDATA_FSTYPE=ext3
++PREINSTALL_FSTYPE=ext3
++WEBTOP_FSTYPE=ext4
+ SS_FSTYPE=vfat
+ SS_PART=mmcblk1p25
+ SS_DIR=/ss/safestrap
+diff --git a/install-files/etc/safestrap/ss_function.sh b/install-files/etc/safestrap/ss_function.sh
+index 4c331a9..928e81a 100755
+--- a/install-files/etc/safestrap/ss_function.sh
++++ b/install-files/etc/safestrap/ss_function.sh
+@@ -13,6 +13,10 @@ readConfig() {
+ 	USERDATA_FSTYPE=$($BBX fgrep "USERDATA_FSTYPE=" $SS_CONFIG | $BBX sed 's/USERDATA_FSTYPE=//')
+ 	BLOCK_CACHE=$($BBX fgrep "CACHE=" $SS_CONFIG | $BBX sed 's/CACHE=//')
+ 	BLOCK_BOOT=$($BBX fgrep "BOOT=" $SS_CONFIG | $BBX sed 's/BOOT=//')
++	BLOCK_PREINSTALL=$($BBX fgrep "PREINSTALL=" $SS_CONFIG | $BBX sed 's/PREINSTALL=//')
++	PREINSTALL_FSTYPE=$($BBX fgrep "PREINSTALL_FSTYPE=" $SS_CONFIG | $BBX sed 's/PREINSTALL_FSTYPE=//')
++	BLOCK_WEBTOP=$($BBX fgrep "WEBTOP=" $SS_CONFIG | $BBX sed 's/WEBTOP=//')
++	WEBTOP_FSTYPE=$($BBX fgrep "WEBTOP_FSTYPE=" $SS_CONFIG | $BBX sed 's/WEBTOP_FSTYPE=//')
+ 	SS_PART=$($BBX fgrep "SS_PART=" $SS_CONFIG | $BBX sed 's/SS_PART=//')
+ 	SS_FSTYPE=$($BBX fgrep "SS_FSTYPE=" $SS_CONFIG | $BBX sed 's/SS_FSTYPE=//')
+ 	SS_DIR=$($BBX fgrep "SS_DIR=" $SS_CONFIG | $BBX sed 's/SS_DIR=//')
+diff --git a/ramdisk-recovery/etc/twrp.fstab b/ramdisk-recovery/etc/twrp.fstab
+index 486dac6..7167613 100644
+--- a/ramdisk-recovery/etc/twrp.fstab
++++ b/ramdisk-recovery/etc/twrp.fstab
+@@ -5,6 +5,5 @@
+ /data           ext3      /dev/block/userdata
+ /cache          ext3      /dev/block/cache
+ /system         ext3      /dev/block/system                        flags=usermrf
+-/osh            ext3      /dev/block/webtop                        flags=display="Webtop";backup=y;usermrf
+ /systemorig     auto      /dev/block/mmcblk1p20-orig               flags=hidden
+ /ss             vfat      /dev/block/emstorage                     flags=hidden
+diff --git a/ramdisk-recovery/res/ui.xml b/ramdisk-recovery/res/ui.xml
+index 12b59c4..93edd56 100644
+--- a/ramdisk-recovery/res/ui.xml
++++ b/ramdisk-recovery/res/ui.xml
+@@ -4686,12 +4686,14 @@
+ 
+ 			<object type="text" color="%text_color%">
+ 				<condition var1="tw_trybootslot" op="!=" var2="stock" />
++				<condition var1="tw_trybootslot" op="!=" var2="altpart" />
+ 				<font resource="font" />
+ 				<placement x="%col1_x%" y="%row6_text_y%" />
+ 				<text>Nickname:</text>
+ 			</object>
+ 			<object type="text" color="%text_color%">
+ 				<condition var1="tw_trybootslot" op="!=" var2="stock" />
++				<condition var1="tw_trybootslot" op="!=" var2="altpart" />
+ 				<font resource="font" />
+ 				<placement x="%center_x%" y="%row6_text_y%" />
+ 				<text>%tw_slotname%</text>
+@@ -4738,6 +4740,7 @@
+ 
+ 			<object type="button">
+ 				<condition var1="tw_trybootslot" op="!=" var2="stock" />
++				<condition var1="tw_trybootslot" op="!=" var2="altpart" />
+ 				<placement x="%col2_x%" y="%row3_y%" />
+ 				<font resource="font" color="%button_text_color%" />
+ 				<text>Set Nickname</text>
+@@ -4751,6 +4754,7 @@
+ 			<object type="button">
+ 				<condition var1="tw_trybootslot" op="!=" var2="tw_bootslot" />
+ 				<condition var1="tw_trybootslot" op="!=" var2="stock" />
++				<condition var1="tw_trybootslot" op="!=" var2="altpart" />
+ 				<placement x="%col1_x%" y="%row4_y%" />
+ 				<font resource="font" color="%button_text_disable_color%" />
+ 				<text>FS Check (Not Active)</text>
+@@ -4759,6 +4763,7 @@
+ 			<object type="button">
+ 				<condition var1="tw_trybootslot" op="=" var2="tw_bootslot" />
+ 				<condition var1="tw_trybootslot" op="!=" var2="stock" />
++				<condition var1="tw_trybootslot" op="!=" var2="altpart" />
+ 				<placement x="%col1_x%" y="%row4_y%" />
+ 				<font resource="font" color="%button_text_color%" />
+ 				<text>FS Check</text>
+@@ -4771,6 +4776,7 @@
+ 			<object type="button">
+ 				<condition var1="tw_trybootslot" op="!=" var2="tw_bootslot" />
+ 				<condition var1="tw_trybootslot" op="!=" var2="stock" />
++				<condition var1="tw_trybootslot" op="!=" var2="altpart" />
+ 				<placement x="%col2_x%" y="%row4_y%" />
+ 				<font resource="font" color="%button_text_color%" />
+ 				<text>Delete</text>
+@@ -4789,6 +4795,7 @@
+ 			<object type="button">
+ 				<condition var1="tw_trybootslot" op="=" var2="tw_bootslot" />
+ 				<condition var1="tw_trybootslot" op="!=" var2="stock" />
++				<condition var1="tw_trybootslot" op="!=" var2="altpart" />
+ 				<placement x="%col2_x%" y="%row4_y%" />
+ 				<font resource="font" color="%button_text_disable_color%" />
+ 				<text>Delete</text>
+@@ -4875,6 +4882,29 @@
+ 			</object>
+ 
+ 			<object type="button">
++				<condition var1="tw_bootslot" op="!=" var2="altpart" />
++				<placement x="%col2_x%" y="%row2_y%" />
++				<font resource="font" color="%button_text_color%" />
++				<text>Webtop -&gt; System</text>
++				<image resource="main_button" />
++				<actions>
++					<action function="set">tw_trybootslot=altpart</action>
++					<action function="page">boot_slot_manage</action>
++				</actions>
++			</object>
++			<object type="button">
++				<condition var1="tw_bootslot" var2="altpart" />
++				<placement x="%col2_x%" y="%row2_y%" />
++				<font resource="font" color="%button_text_highlight_color%" />
++				<text>Webtop -&gt; System</text>
++				<image resource="main_button_highlight" />
++				<actions>
++					<action function="set">tw_trybootslot=altpart</action>
++					<action function="page">boot_slot_manage</action>
++				</actions>
++			</object>
++
++			<object type="button">
+ 				<condition var1="tw_bootslot" op="!=" var2="stock" />
+ 				<placement x="%col2_x%" y="%row1_y%" />
+ 				<font resource="font" color="%button_text_color%" />
+diff --git a/ramdisk-recovery/sbin/changeslot.sh b/ramdisk-recovery/sbin/changeslot.sh
+index 241d0ab..c21c6ca 100755
+--- a/ramdisk-recovery/sbin/changeslot.sh
++++ b/ramdisk-recovery/sbin/changeslot.sh
+@@ -29,6 +29,12 @@ if [ "$SS_SLOT" = "stock" ]; then
+ 	$BBX ln -s $BLOCK_DIR/$BLOCK_CACHE-orig $BLOCK_DIR/$BLOCK_CACHE
+ #	$BBX ln -s $BLOCK_DIR/$BLOCK_BOOT-orig $BLOCK_DIR/$BLOCK_BOOT
+ 	$BBX ln -s /dev/null $BLOCK_DIR/$BLOCK_BOOT
++elif [ "$SS_SLOT" = "altpart" ]; then
++	$BBX ln -s $BLOCK_DIR/$BLOCK_WEBTOP $BLOCK_DIR/$BLOCK_SYSTEM
++	$BBX ln -s $BLOCK_DIR/$BLOCK_USERDATA-orig $BLOCK_DIR/$BLOCK_USERDATA
++	$BBX ln -s $BLOCK_DIR/$BLOCK_CACHE-orig $BLOCK_DIR/$BLOCK_CACHE
++#	$BBX ln -s $BLOCK_DIR/loop-boot $BLOCK_DIR/$BLOCK_BOOT
++	$BBX ln -s /dev/null $BLOCK_DIR/$BLOCK_BOOT
+ else
+ 	$BBX losetup $BLOCK_DIR/loop-system $SS_DIR/$SS_SLOT/system.img
+ 	$BBX losetup $BLOCK_DIR/loop-userdata $SS_DIR/$SS_SLOT/userdata.img
+diff --git a/ramdisk-recovery/sbin/fixboot.sh b/ramdisk-recovery/sbin/fixboot.sh
+index 8471b11..19036e3 100755
+--- a/ramdisk-recovery/sbin/fixboot.sh
++++ b/ramdisk-recovery/sbin/fixboot.sh
+@@ -69,6 +69,12 @@ if [ ! -e "$BLOCK_DIR/$BLOCK_SYSTEM-orig" ]; then
+ 		$BBX ln -s $BLOCK_DIR/loop-cache $BLOCK_DIR/$BLOCK_CACHE
+ #		$BBX ln -s $BLOCK_DIR/loop-boot $BLOCK_DIR/$BLOCK_BOOT
+ 		$BBX ln -s /dev/null $BLOCK_DIR/$BLOCK_BOOT
++	elif [ "$SLOT_LOC" = "altpart" ]; then
++		$BBX ln -s $BLOCK_DIR/$BLOCK_WEBTOP $BLOCK_DIR/$BLOCK_SYSTEM
++		$BBX ln -s $BLOCK_DIR/$BLOCK_USERDATA-orig $BLOCK_DIR/$BLOCK_USERDATA
++		$BBX ln -s $BLOCK_DIR/$BLOCK_CACHE-orig $BLOCK_DIR/$BLOCK_CACHE
++#		$BBX ln -s $BLOCK_DIR/loop-boot $BLOCK_DIR/$BLOCK_BOOT
++		$BBX ln -s /dev/null $BLOCK_DIR/$BLOCK_BOOT
+ 	else
+ 		echo "stock" > $SS_DIR/active_slot
+ 		$BBX ln -s $BLOCK_DIR/$BLOCK_SYSTEM-orig $BLOCK_DIR/$BLOCK_SYSTEM
+diff --git a/ramdisk-recovery/sbin/ss_function.sh b/ramdisk-recovery/sbin/ss_function.sh
+index 4c331a9..928e81a 100755
+--- a/ramdisk-recovery/sbin/ss_function.sh
++++ b/ramdisk-recovery/sbin/ss_function.sh
+@@ -13,6 +13,10 @@ readConfig() {
+ 	USERDATA_FSTYPE=$($BBX fgrep "USERDATA_FSTYPE=" $SS_CONFIG | $BBX sed 's/USERDATA_FSTYPE=//')
+ 	BLOCK_CACHE=$($BBX fgrep "CACHE=" $SS_CONFIG | $BBX sed 's/CACHE=//')
+ 	BLOCK_BOOT=$($BBX fgrep "BOOT=" $SS_CONFIG | $BBX sed 's/BOOT=//')
++	BLOCK_PREINSTALL=$($BBX fgrep "PREINSTALL=" $SS_CONFIG | $BBX sed 's/PREINSTALL=//')
++	PREINSTALL_FSTYPE=$($BBX fgrep "PREINSTALL_FSTYPE=" $SS_CONFIG | $BBX sed 's/PREINSTALL_FSTYPE=//')
++	BLOCK_WEBTOP=$($BBX fgrep "WEBTOP=" $SS_CONFIG | $BBX sed 's/WEBTOP=//')
++	WEBTOP_FSTYPE=$($BBX fgrep "WEBTOP_FSTYPE=" $SS_CONFIG | $BBX sed 's/WEBTOP_FSTYPE=//')
+ 	SS_PART=$($BBX fgrep "SS_PART=" $SS_CONFIG | $BBX sed 's/SS_PART=//')
+ 	SS_FSTYPE=$($BBX fgrep "SS_FSTYPE=" $SS_CONFIG | $BBX sed 's/SS_FSTYPE=//')
+ 	SS_DIR=$($BBX fgrep "SS_DIR=" $SS_CONFIG | $BBX sed 's/SS_DIR=//')
+diff --git a/ramdisk-recovery/ss.config b/ramdisk-recovery/ss.config
+index 2d01408..2d6779a 100644
+--- a/ramdisk-recovery/ss.config
++++ b/ramdisk-recovery/ss.config
+@@ -3,8 +3,12 @@ SYSTEM=mmcblk1p20
+ USERDATA=mmcblk1p24
+ CACHE=mmcblk1p21
+ BOOT=mmcblk1p14
++PREINSTALL=mmcblk1p22
++WEBTOP=mmcblk1p23
+ SYSTEM_FSTYPE=ext3
+ USERDATA_FSTYPE=ext3
++PREINSTALL_FSTYPE=ext3
++WEBTOP_FSTYPE=ext4
+ SS_FSTYPE=vfat
+ SS_PART=mmcblk1p25
+ SS_DIR=/ss/safestrap
