@@ -152,7 +152,7 @@ fi
 if [ ! -z ${PATCH_FILE} ]
 then
   echo "=== Patching ==================================================================="
-  patch -d ${TEMP_DIR} -p0 < ${PATCH_FILE} || exit $?
+  patch -d ${TEMP_DIR} -p1 < ${PATCH_FILE} || exit $?
 fi
 
 if [ ! -z ${IN_DIR} ]
