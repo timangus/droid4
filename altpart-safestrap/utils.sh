@@ -22,9 +22,9 @@ function splitRamdiskImage
     local OFFSET=$(grep -Uboa $'\x1f\x8b\x08' \
       ${FILE} | \
       perl -pe 's/([0-9]+):.*/$1/' | head -n 2 | tail -n 1)
-    dd count=${OFFSET} bs=1 if=${ROM_RAMDISK} \
+    dd count=${OFFSET} bs=1 if=${FILE} \
       of=${OUT_DIR}/${BASE_FILE}.1.cpio.gz
-    dd skip=${OFFSET} bs=1 if=${ROM_RAMDISK} \
+    dd skip=${OFFSET} bs=1 if=${FILE} \
       of=${OUT_DIR}/${BASE_FILE}.2.cpio.gz
   )
 
@@ -55,8 +55,7 @@ function unpackRamdiskImage
   fi
 
   (
-    cd ${OUT_DIR}
-    gzip -cd ${FILE} | cpio -i
+    gzip -cd ${FILE} | cpio -i -D ${OUT_DIR}
   ) || return $?
 
   return 0
@@ -80,9 +79,8 @@ function packRamdiskImage
     return 2
   fi
 
-  (
-    cd ${IN_DIR}
-    find . | cpio -o -H newc --owner=root:root | gzip > \
+  (    
+    find ${IN_DIR} -printf '%P\n' | cpio -o -H newc --owner=root:root -D ${IN_DIR} | gzip > \
       ${FILE}
   ) || return 3
 
