@@ -13,7 +13,7 @@ fi
 
 MD5=($(md5sum $1))
 BASE_FILE=$(basename ${FILE})
-FILE_DIR=$(dirname ${FILE})
+FILE_DIR=$(dirname `realpath ${FILE}`)
 PATCH_FILE=altpart-patch-${BASE_FILE}
 
 BUILD_DIR="/tmp/altpart-patch"
