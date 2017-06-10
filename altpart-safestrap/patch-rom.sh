@@ -103,6 +103,7 @@ unmount(\"/system\");\n" > \
 cp ${DIR}/update-binary ${BUILD_DIR}/META-INF/com/google/android/
 
 echo "=== Creating patch zip ========================================================="
+pushd
 cd ${BUILD_DIR}
 zip -r9 _${PATCH_FILE} system/ META-INF/
 
@@ -111,7 +112,7 @@ java -jar ${DIR}/signapk/signapk.jar ${DIR}/signapk/key.x509.pem \
   ${DIR}/signapk/key.pk8 _${PATCH_FILE} ${FILE_DIR}/${PATCH_FILE} || exit $?
 
 echo "=== Cleaning up ================================================================"
-cd ..
+popd
 rm -rf ${BUILD_DIR}
 
 echo "Done!"
