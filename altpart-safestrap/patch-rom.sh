@@ -103,8 +103,7 @@ unmount(\"/system\");\n" > \
 cp ${DIR}/update-binary ${BUILD_DIR}/META-INF/com/google/android/
 
 echo "=== Creating patch zip ========================================================="
-pushd
-cd ${BUILD_DIR}
+pushd ${BUILD_DIR}
 zip -r9 _${PATCH_FILE} system/ META-INF/
 
 echo "=== Signing patch zip =========================================================="
