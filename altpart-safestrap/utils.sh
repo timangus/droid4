@@ -33,7 +33,7 @@ function splitRamdiskImage
 
 function unpackRamdiskImage
 {
-  local FILE=$1
+  local FILE=$(readlink -f $1)
 
   if [ ! -e ${FILE} ]
   then
@@ -55,7 +55,8 @@ function unpackRamdiskImage
   fi
 
   (
-    gzip -cd ${FILE} | cpio -i -D ${OUT_DIR}
+    cd ${OUT_DIR}
+    gzip -cd ${FILE} | cpio -i
   ) || return $?
 
   return 0
@@ -71,7 +72,7 @@ function packRamdiskImage
     return 1
   fi
 
-  local FILE=$2
+  local FILE=$(readlink -f $2)
 
   if [ -e ${FILE} ]
   then
@@ -80,8 +81,8 @@ function packRamdiskImage
   fi
 
   (    
-    find ${IN_DIR} -printf '%P\n' | cpio -o -H newc --owner=root:root -D ${IN_DIR} | gzip > \
-      ${FILE}
+    cd ${IN_DIR}
+    find . -printf '%P\n' | cpio -o -H newc --owner=root:root | gzip > ${FILE}
   ) || return 3
 
   return 0
