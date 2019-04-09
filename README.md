@@ -17,4 +17,5 @@ Please note this recovery should be considered **highly experimental** and may b
 Finally, contained in this repository are a build of the modified SafeStrap and a patch for the latest Lineage ROM mentioned above. I'm not 100% on the intricacies of the legal position over distribution of these so if anybody thinks it's an issue let me know and I'll take them down. Don't see why though, really. In any case, the scripts can be used to rebuild the recovery and the patch as required.
 
 #### [Safestrap-maserati-v3.75-altpart.apk](https://github.com/timangus/droid4/blob/master/binaries/Safestrap-maserati-v3.75-altpart.apk)
+#### [Safestrap-maserati-v3.75-altpart.tar.gz](https://github.com/timangus/droid4/blob/master/binaries/Safestrap-maserati-v3.75-altpart.tar.gz)
 #### [altpart-patch-lineage-14.1-20170405-UNOFFICIAL-maserati.zip](https://github.com/timangus/droid4/blob/master/binaries/altpart-patch-lineage-14.1-20170405-UNOFFICIAL-maserati.zip)
