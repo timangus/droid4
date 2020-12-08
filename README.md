@@ -4,7 +4,7 @@ A simple script that will restore to factory state given the relevant firmware z
 ## root
 A script to root a factory flashed device.
 ## altpart-safestrap
-This is an alternative [SafeStrap](https://github.com/stargo/android_packages_apps_Safestrap/releases) that makes use of the unused `/webtop` partition and repurposes it as the `/system` parition. This alleviates the issue where the original `/system` is not large enough to contain a more modern ROM with a gapps package.
+This is an alternative [SafeStrap](https://github.com/stargo/android_packages_apps_Safestrap/releases) that makes use of the unused `/webtop` partition and repurposes it as the `/system` partition. This alleviates the issue where the original `/system` is not large enough to contain a more modern ROM with a gapps package.
 
 After installing the replacement recovery you will find an extra option on the slot selection UI; *Webtop -> System*. Selecting this will use `/webtop` as the `/system` partition when installing. Please note that all the other partitions *stay the same* and are not altered from their stock configuration. This is a key point because it means that the new slot is not a slot in the usual sense in that except for `/system`, all other partitions are *shared* with the stock slot. In order words, attempting to use the stock slot and the *Webtop -> System* slot at the same time is highly unlikely to work and should be avoided.
 
